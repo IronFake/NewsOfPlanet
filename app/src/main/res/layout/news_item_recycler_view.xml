@@ -19,7 +19,6 @@
 
         <TextView
             android:id="@+id/titleNewsTextView"
-            android:text="PGE reaches $13.5 billion settlement with California wildfire victims"
             android:textSize="30sp"
             android:textStyle="bold"
             android:textColor="@android:color/white"
@@ -30,7 +29,6 @@
 
         <TextView
             android:id="@+id/descriptionNewsTextView"
-            android:text="The massive settlement will cover claims stemming from some of the deadliest and most destructive fires in the state’s history, including the 2018 Camp Fire and the 2017 Tubbs Fire."
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/card_elevation"
