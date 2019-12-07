@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">News of Planet</string>
+    <string name="greeting">Hello, %1d</string>
+</resources>
