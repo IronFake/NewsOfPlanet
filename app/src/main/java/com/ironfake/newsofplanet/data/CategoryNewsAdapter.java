@@ -1,6 +1,7 @@
 package com.ironfake.newsofplanet.data;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +19,8 @@ public class CategoryNewsAdapter extends RecyclerView.Adapter<CategoryNewsAdapte
     private Context context;
     private ArrayList<String> categories;
     private OnUserClickListener listener;
+
+    private int indexOnClickCategory = -1;
 
     public interface OnUserClickListener{
         void onUserClick(int position);
@@ -41,11 +44,10 @@ public class CategoryNewsAdapter extends RecyclerView.Adapter<CategoryNewsAdapte
     }
 
     @Override
-    public void onBindViewHolder(@NonNull CategoryNewsViewHolder holder, int position) {
-        String category = categories.get(position);
-
-        holder.categoryTextView.setText(category);
-
+    public void onBindViewHolder(@NonNull CategoryNewsViewHolder holder, final int position) {
+//        String category = categories.get(position);
+//        holder.categoryTextView.setText(category);
+        holder.bindItem(position);
     }
 
     @Override
@@ -67,11 +69,23 @@ public class CategoryNewsAdapter extends RecyclerView.Adapter<CategoryNewsAdapte
                     if (listener != null){
                         int position = getAdapterPosition();
                         if (position != RecyclerView.NO_POSITION){
+                            indexOnClickCategory = position;
+                            notifyDataSetChanged();
                             listener.onUserClick(position);
                         }
                     }
                 }
             });
         }
+        private void bindItem(int position) {
+            String category = categories.get(position);
+            categoryTextView.setText(category);
+            if (indexOnClickCategory == position){
+                categoryTextView.setTextColor(Color.RED);
+            } else {
+                categoryTextView.setTextColor(Color.BLACK);
+            }
+        }
+
     }
 }

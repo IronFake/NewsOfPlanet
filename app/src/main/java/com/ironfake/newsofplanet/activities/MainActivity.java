@@ -3,9 +3,13 @@ package com.ironfake.newsofplanet.activities;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import android.app.DownloadManager;
 import android.app.VoiceInteractor;
+import android.content.Intent;
+import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -19,6 +23,10 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.ironfake.newsofplanet.R;
 import com.ironfake.newsofplanet.data.CategoryNewsAdapter;
 import com.ironfake.newsofplanet.data.NewsAdapter;
@@ -46,7 +54,12 @@ public class MainActivity extends AppCompatActivity {
     private RequestQueue requestQueue;
 
     private SearchView searchView;
+    private SwipeRefreshLayout swipeRefreshLayout;
 
+    private String url;
+
+    private FusedLocationProviderClient fusedLocationProviderClient;
+    private LatLng userLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,19 +102,40 @@ public class MainActivity extends AppCompatActivity {
         newsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         newsArrayList = new ArrayList<>();
         requestQueue = Volley.newRequestQueue(this);
+
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                getNews(url);
+                swipeRefreshLayout.setRefreshing(false);
+            }
+        });
+
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
+            @Override
+            public void onSuccess(Location location) {
+
+                if (location != null){
+
+                }
+
+            }
+        });
+
         getNews("");
 
     }
 
     private void getNews(String query) {
         newsArrayList.clear();
-        String url;
         if (query.contains("q=")){
-            url = "https://newsapi.org/v2/everything?q=" +query + "&apiKey=" + API_KEY;
+            url = "https://newsapi.org/v2/everything?language=en&q=" +query + "&apiKey=" + API_KEY;
         } else if (query.contains("category=")){
-            url = "https://newsapi.org/v2/top-headlines?" +query + "&apiKey=" + API_KEY;
+            url = "https://newsapi.org/v2/top-headlines?country=us&" +query + "&apiKey=" + API_KEY;
         } else {
-            url = "https://newsapi.org/v2/top-headlines?category=general&apiKey=" + API_KEY;
+            url = "https://newsapi.org/v2/top-headlines?country=us&category=general&apiKey=" + API_KEY;
         }
 
         JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null,
@@ -111,20 +145,44 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             JSONArray jsonArray = response.getJSONArray("articles");
                             for (int i = 0; i < jsonArray.length(); i++) {
-                                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                                JSONObject newsJsonObject = jsonArray.getJSONObject(i);
 
-                                String title = jsonObject.getString("title");
-                                String description = jsonObject.getString("description");
-                                String imageUrl = jsonObject.getString("urlToImage");
+                                String title = newsJsonObject.getString("title");
+                                String description = newsJsonObject.getString("description");
+                                String imageUrl = newsJsonObject.getString("urlToImage");
+                                String siteNewsUrl = newsJsonObject.getString("url");
+                                String author = newsJsonObject.getString("author");
 
-                                News news = new News();
-                                news.setTitle(title);
-                                news.setShortDescription(description);
-                                news.setImageUrl(imageUrl);
-                                newsArrayList.add(news);
+                                JSONObject newsSourceJsonObject = newsJsonObject.getJSONObject("source");
+                                String newsSource = newsSourceJsonObject.getString("name");
+
+
+                                if (!imageUrl.equals("null")){
+                                    News news = new News();
+                                    news.setTitle(title);
+                                    news.setShortDescription(description);
+                                    news.setImageUrl(imageUrl);
+                                    news.setSiteNewsUrl(siteNewsUrl);
+                                    if (!author.equals("null")) news.setAuthor(author);
+                                    news.setNewsSource(newsSource);
+                                    newsArrayList.add(news);
+                                }
                             }
-                            Log.d("News", String.valueOf(newsArrayList));
                             newsAdapter = new NewsAdapter(MainActivity.this, newsArrayList);
+                            newsAdapter.setOnUserClickListener(new NewsAdapter.OnUserClickListener() {
+                                @Override
+                                public void onUserClick(int position) {
+                                    News news = newsArrayList.get(position);
+                                    Uri address = Uri.parse(news.getSiteNewsUrl());
+                                    Intent openLinkIntent = new Intent(Intent.ACTION_VIEW, address);
+
+                                    if (openLinkIntent.resolveActivity(getPackageManager()) != null) {
+                                        startActivity(openLinkIntent);
+                                    } else {
+                                        Log.d("Intent", "Не получается обработать намерение!");
+                                    }
+                                }
+                            });
                             newsRecyclerView.setAdapter(newsAdapter);
                         } catch (JSONException e) {
                             e.printStackTrace();
