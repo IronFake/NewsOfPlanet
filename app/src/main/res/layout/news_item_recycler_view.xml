@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="@dimen/card_elevation"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    app:cardCornerRadius="@dimen/card_corner_radius"
+    app:cardElevation="@dimen/card_elevation">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/newsImageView"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"/>
+
+        <TextView
+            android:id="@+id/titleNewsTextView"
+            android:text="PGE reaches $13.5 billion settlement with California wildfire victims"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:layout_margin="@dimen/card_elevation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@id/newsImageView"/>
+
+        <TextView
+            android:id="@+id/descriptionNewsTextView"
+            android:text="The massive settlement will cover claims stemming from some of the deadliest and most destructive fires in the state’s history, including the 2018 Camp Fire and the 2017 Tubbs Fire."
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/card_elevation"
+            android:layout_marginTop="10dp"
+            android:layout_below="@id/newsImageView"/>
+
+    </RelativeLayout>
+</androidx.cardview.widget.CardView>
