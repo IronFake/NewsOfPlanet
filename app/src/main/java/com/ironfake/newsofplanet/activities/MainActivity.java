@@ -1,32 +1,61 @@
 package com.ironfake.newsofplanet.activities;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import android.app.DownloadManager;
-import android.app.VoiceInteractor;
+import android.Manifest;
+import android.app.Activity;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.BuildConfig;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
+import com.google.android.gms.location.SettingsClient;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.android.material.snackbar.Snackbar;
 import com.ironfake.newsofplanet.R;
 import com.ironfake.newsofplanet.data.CategoryNewsAdapter;
 import com.ironfake.newsofplanet.data.NewsAdapter;
@@ -38,9 +67,11 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
-    private final String API_KEY = "ef28b00ad7e34564b0628ee9dffc4bfc";
+    private final String API_KEY_NEWS = "ef28b00ad7e34564b0628ee9dffc4bfc";
+    private final String API_KEY_WEATHER = "763ee1da671f4f21913bffda4f36937d";
 
     private RecyclerView newsRecyclerView;
     private NewsAdapter newsAdapter;
@@ -56,10 +87,24 @@ public class MainActivity extends AppCompatActivity {
     private SearchView searchView;
     private SwipeRefreshLayout swipeRefreshLayout;
 
-    private String url;
+    private String newsUrl;
 
-    private FusedLocationProviderClient fusedLocationProviderClient;
-    private LatLng userLocation;
+    private ImageView weatherImageView;
+    private TextView tempTextView, townTextView, appTempTextView, humidityTextView, windSpeedTextView;
+
+    //location
+    private Location location;
+    private GoogleApiClient googleApiClient;
+    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
+    private LocationRequest locationRequest;
+    private static final long UPDATE_INTERVAL = 5000, FASTEST_INTERVAL = 5000; // 5 seconds
+
+    //lists for permissions
+    ArrayList<String> permissionsToRequest;
+    ArrayList<String> permissionsRejected = new ArrayList<>();
+    ArrayList<String> permissions = new ArrayList<>();
+    // integer for permissions result request
+    private static final int ALL_PERMISSIONS_RESULT = 1011;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,93 +152,305 @@ public class MainActivity extends AppCompatActivity {
         swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                getNews(url);
+                getNews(newsUrl);
                 swipeRefreshLayout.setRefreshing(false);
             }
         });
 
-        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
-        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, new OnSuccessListener<Location>() {
-            @Override
-            public void onSuccess(Location location) {
+        //we add permissions we need to request location of the users
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
 
-                if (location != null){
+        permissionsToRequest = permissionsToRequest(permissions);
 
-                }
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            if (permissionsToRequest.size() > 0){
+                requestPermissions(permissionsToRequest
+                        .toArray(new String[permissionsToRequest.size()]),ALL_PERMISSIONS_RESULT
+                );
             }
-        });
+        }
+
+        //we build google api client
+        googleApiClient = new GoogleApiClient.Builder(this).
+                addApi(LocationServices.API).
+                addConnectionCallbacks(this).
+                addOnConnectionFailedListener(this).build();
 
         getNews("");
+    }
 
+    private ArrayList<String> permissionsToRequest(ArrayList<String> wantedPermissions) {
+        ArrayList<String> result = new ArrayList<>();
+        for (String perm: wantedPermissions) {
+            if (!hasPermission(perm)){
+                result.add(perm);
+            }
+        }
+        return result;
+    }
+
+    private boolean hasPermission(String permission) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+        }
+        return true;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        if (googleApiClient != null){
+            googleApiClient.connect();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (!checkPlayServices()){
+            Toast.makeText(this,
+                    "You need to install Google Play Services", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        //stop location updates
+        if (googleApiClient != null && googleApiClient.isConnected()){
+            LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
+            googleApiClient.disconnect();
+        }
+    }
+
+    private boolean checkPlayServices() {
+        GoogleApiAvailability apiAvailability = GoogleApiAvailability.getInstance();
+        int resultCode = apiAvailability.isGooglePlayServicesAvailable(this);
+        if (resultCode != ConnectionResult.SUCCESS){
+            if (apiAvailability.isUserResolvableError(resultCode)) {
+                apiAvailability.getErrorDialog(this, resultCode,
+                        PLAY_SERVICES_RESOLUTION_REQUEST);
+            }else {
+                finish();
+            }
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+            return;
+        }
+        //Permissions ok, we get last location
+        location = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+
+        if (location != null){
+            getWeather(location.getLatitude(), location.getLongitude());
+//            locationTextView.setText(getString(R.string.location,
+//                    location.getLatitude(), location.getLongitude()));
+        }
+        startLocationUpdates();
+    }
+
+    private void startLocationUpdates() {
+        locationRequest = new LocationRequest();
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationRequest.setInterval(UPDATE_INTERVAL);
+        locationRequest.setFastestInterval(FASTEST_INTERVAL);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this,
+                    "You need to enable permissions to display location!",
+                    Toast.LENGTH_SHORT).show();
+        }
+
+        LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient,
+                locationRequest, this);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+        if (location != null){
+            getWeather(location.getLatitude(), location.getLongitude());
+//            locationTextView.setText(getString(R.string.location,
+//                    location.getLatitude(), location.getLongitude()));
+        }
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode){
+            case ALL_PERMISSIONS_RESULT:
+                for (String perm : permissionsToRequest){
+                    if (!hasPermission(perm)){
+                        permissionsRejected.add(perm);
+                    }
+                }
+                if (permissionsRejected.size() > 0){
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                        if (shouldShowRequestPermissionRationale(
+                                permissionsRejected.get(0))){
+                            new AlertDialog.Builder(MainActivity.this).
+                                    setMessage("These permissions are mandatory to get your location. You need to allow them").
+                                    setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                                                requestPermissions(permissionsRejected.toArray(
+                                                        new String[permissionsRejected.size()]),
+                                                        ALL_PERMISSIONS_RESULT);
+                                            }
+                                        }
+                                    }).
+                                    setNegativeButton("Cancel", null).create().show();
+                            return;
+                        }
+                    }
+                } else {
+                    if (googleApiClient != null){
+                        googleApiClient.connect();
+                    }
+                }
+
+                break;
+        }
     }
 
     private void getNews(String query) {
         newsArrayList.clear();
         if (query.contains("q=")){
-            url = "https://newsapi.org/v2/everything?language=en&q=" +query + "&apiKey=" + API_KEY;
+            newsUrl = "https://newsapi.org/v2/everything?language=en&q=" +query + "&apiKey=" + API_KEY_NEWS;
         } else if (query.contains("category=")){
-            url = "https://newsapi.org/v2/top-headlines?country=us&" +query + "&apiKey=" + API_KEY;
+            newsUrl = "https://newsapi.org/v2/top-headlines?country=us&" +query + "&apiKey=" + API_KEY_NEWS;
         } else {
-            url = "https://newsapi.org/v2/top-headlines?country=us&category=general&apiKey=" + API_KEY;
+            newsUrl = "https://newsapi.org/v2/top-headlines?country=us&category=general&apiKey=" + API_KEY_NEWS;
         }
 
-        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        try {
-                            JSONArray jsonArray = response.getJSONArray("articles");
-                            for (int i = 0; i < jsonArray.length(); i++) {
-                                JSONObject newsJsonObject = jsonArray.getJSONObject(i);
+        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, newsUrl, null,
+            new Response.Listener<JSONObject>() {
+                @Override
+                public void onResponse(JSONObject response) {
+                try {
+                    JSONArray jsonArray = response.getJSONArray("articles");
+                    for (int i = 0; i < jsonArray.length(); i++) {
+                        JSONObject newsJsonObject = jsonArray.getJSONObject(i);
 
-                                String title = newsJsonObject.getString("title");
-                                String description = newsJsonObject.getString("description");
-                                String imageUrl = newsJsonObject.getString("urlToImage");
-                                String siteNewsUrl = newsJsonObject.getString("url");
-                                String author = newsJsonObject.getString("author");
+                        String title = newsJsonObject.getString("title");
+                        String description = newsJsonObject.getString("description");
+                        String imageUrl = newsJsonObject.getString("urlToImage");
+                        String siteNewsUrl = newsJsonObject.getString("url");
+                        String author = newsJsonObject.getString("author");
 
-                                JSONObject newsSourceJsonObject = newsJsonObject.getJSONObject("source");
-                                String newsSource = newsSourceJsonObject.getString("name");
+                        JSONObject newsSourceJsonObject = newsJsonObject.getJSONObject("source");
+                        String newsSource = newsSourceJsonObject.getString("name");
 
-
-                                if (!imageUrl.equals("null")){
-                                    News news = new News();
-                                    news.setTitle(title);
-                                    news.setShortDescription(description);
-                                    news.setImageUrl(imageUrl);
-                                    news.setSiteNewsUrl(siteNewsUrl);
-                                    if (!author.equals("null")) news.setAuthor(author);
-                                    news.setNewsSource(newsSource);
-                                    newsArrayList.add(news);
-                                }
-                            }
-                            newsAdapter = new NewsAdapter(MainActivity.this, newsArrayList);
-                            newsAdapter.setOnUserClickListener(new NewsAdapter.OnUserClickListener() {
-                                @Override
-                                public void onUserClick(int position) {
-                                    News news = newsArrayList.get(position);
-                                    Uri address = Uri.parse(news.getSiteNewsUrl());
-                                    Intent openLinkIntent = new Intent(Intent.ACTION_VIEW, address);
-
-                                    if (openLinkIntent.resolveActivity(getPackageManager()) != null) {
-                                        startActivity(openLinkIntent);
-                                    } else {
-                                        Log.d("Intent", "Не получается обработать намерение!");
-                                    }
-                                }
-                            });
-                            newsRecyclerView.setAdapter(newsAdapter);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
+                        if (!imageUrl.equals("null")){
+                            News news = new News();
+                            news.setTitle(title);
+                            news.setShortDescription(description);
+                            news.setImageUrl(imageUrl);
+                            news.setSiteNewsUrl(siteNewsUrl);
+                            if (!author.equals("null")) news.setAuthor(author);
+                            news.setNewsSource(newsSource);
+                            newsArrayList.add(news);
                         }
                     }
-                }, new Response.ErrorListener() {
+                    newsAdapter = new NewsAdapter(MainActivity.this, newsArrayList);
+                    newsAdapter.setOnUserClickListener(new NewsAdapter.OnUserClickListener() {
+                        @Override
+                        public void onUserClick(int position) {
+                            News news = newsArrayList.get(position);
+                            Uri address = Uri.parse(news.getSiteNewsUrl());
+                            Intent openLinkIntent = new Intent(Intent.ACTION_VIEW, address);
+
+                            if (openLinkIntent.resolveActivity(getPackageManager()) != null) {
+                                startActivity(openLinkIntent);
+                            } else {
+                                Log.d("Intent", "Не получается обработать намерение!");
+                            }
+                        }
+                    });
+                    newsRecyclerView.setAdapter(newsAdapter);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                }
+            }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
             }
         });
         requestQueue.add(request);
+    }
+
+    private void getWeather(Double currentLatitude, Double currentLongitude){
+
+        weatherImageView = findViewById(R.id.weatherImageView);
+        tempTextView = findViewById(R.id.temperatureTextView);
+        townTextView = findViewById(R.id.townTextView);
+        appTempTextView = findViewById(R.id.appTempTextView);
+        humidityTextView = findViewById(R.id.humidityTextView);
+        windSpeedTextView = findViewById(R.id.windSpeedTextView);
+
+        String weatherUrl = "https://api.weatherbit.io/v2.0/current?lat=" + currentLatitude +
+                "&lon=" + currentLongitude + "&key=" + API_KEY_WEATHER;
+
+        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, weatherUrl, null,
+            new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                    try {
+                        JSONArray jsonArray = response.getJSONArray("data");
+                        for (int i = 0; i < jsonArray.length(); i++) {
+                            JSONObject newsJsonObject = jsonArray.getJSONObject(i);
+
+                            String temperature = newsJsonObject.getString("temp");
+                            String town = newsJsonObject.getString("city_name");
+                            String appTemp = newsJsonObject.getString("app_temp");
+                            String humidity = newsJsonObject.getString("rh");
+                            String windSpeed = newsJsonObject.getString("wind_spd");
+
+                            weatherImageView.setImageResource(R.drawable.weather);
+                            tempTextView.setText(getString(R.string.temperature, temperature));
+                            townTextView.setText(town);
+                            appTempTextView.setText(getString(R.string.app_temperature, appTemp));
+                            humidityTextView.setText(getString(R.string.humidity, humidity));
+                            windSpeedTextView.setText(getString(R.string.wind_speed, windSpeed));
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, new Response.ErrorListener() {
+        @Override
+        public void onErrorResponse(VolleyError error) {
+            error.printStackTrace();
+        }
+    });
+    requestQueue.add(request);
     }
 }

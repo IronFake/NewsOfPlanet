@@ -2,4 +2,10 @@
     <string name="app_name">News of Planet</string>
     <string name="greeting">Hello, %1d</string>
     <string name="search_hint">Find news</string>
+
+    <string name="temperature">%1$s\u00B0</string>
+    <string name="app_temperature">Apparent Temperature: %1$s\u00B0</string>
+    <string name="humidity">Humidity: %1$s</string>
+    <string name="wind_speed">Wind speed: %1$s m/s</string>
+
 </resources>
