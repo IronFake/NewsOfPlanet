@@ -20,7 +20,7 @@ public class CategoryNewsAdapter extends RecyclerView.Adapter<CategoryNewsAdapte
     private ArrayList<String> categories;
     private OnUserClickListener listener;
 
-    private int indexOnClickCategory = -1;
+    private int indexOnClickCategory = 2; // General;
 
     public interface OnUserClickListener{
         void onUserClick(int position);

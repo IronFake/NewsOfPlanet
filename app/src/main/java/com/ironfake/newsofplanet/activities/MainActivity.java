@@ -10,17 +10,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Looper;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -28,7 +24,6 @@ import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.android.volley.BuildConfig;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -37,25 +32,10 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResolvableApiException;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResponse;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.location.SettingsClient;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
-import com.google.android.material.snackbar.Snackbar;
 import com.ironfake.newsofplanet.R;
 import com.ironfake.newsofplanet.data.CategoryNewsAdapter;
 import com.ironfake.newsofplanet.data.NewsAdapter;
@@ -88,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private SwipeRefreshLayout swipeRefreshLayout;
 
     private String newsUrl;
+    private String currentCategory;
 
     private ImageView weatherImageView;
     private TextView tempTextView, townTextView, appTempTextView, humidityTextView, windSpeedTextView;
@@ -112,10 +93,18 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         setContentView(R.layout.activity_main);
 
         searchView = findViewById(R.id.searchView);
+        searchView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                searchView.setIconified(false);
+            }
+        });
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 getNews("q=" + query.trim());
+                searchView.setQuery(query, false);
+                searchView.clearFocus();
                 return true;
             }
 
@@ -137,7 +126,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         categoryNewsAdapter.setOnUserClickListener(new CategoryNewsAdapter.OnUserClickListener() {
             @Override
             public void onUserClick(int position) {
-                getNews("category=" +categories[position]);
+                currentCategory = categories[position];
+                getNews("category=" +currentCategory);
             }
         });
         categoryNewsRecyclerView.setAdapter(categoryNewsAdapter);
@@ -152,7 +142,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                getNews(newsUrl);
+                if (!searchView.getQuery().toString().trim().equals("")){
+                    getNews("q=" + searchView.getQuery().toString().trim());
+                }else getNews("category=" +currentCategory);
                 swipeRefreshLayout.setRefreshing(false);
             }
         });
@@ -253,7 +245,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         location = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
 
         if (location != null){
-            getWeather(location.getLatitude(), location.getLongitude());
+            //getWeather(location.getLatitude(), location.getLongitude());
 //            locationTextView.setText(getString(R.string.location,
 //                    location.getLatitude(), location.getLongitude()));
         }
@@ -292,7 +284,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onLocationChanged(Location location) {
 
         if (location != null){
-            getWeather(location.getLatitude(), location.getLongitude());
+            //getWeather(location.getLatitude(), location.getLongitude());
 //            locationTextView.setText(getString(R.string.location,
 //                    location.getLatitude(), location.getLongitude()));
         }
@@ -425,15 +417,18 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     try {
                         JSONArray jsonArray = response.getJSONArray("data");
                         for (int i = 0; i < jsonArray.length(); i++) {
-                            JSONObject newsJsonObject = jsonArray.getJSONObject(i);
+                            JSONObject jsonObject = jsonArray.getJSONObject(i);
 
-                            String temperature = newsJsonObject.getString("temp");
-                            String town = newsJsonObject.getString("city_name");
-                            String appTemp = newsJsonObject.getString("app_temp");
-                            String humidity = newsJsonObject.getString("rh");
-                            String windSpeed = newsJsonObject.getString("wind_spd");
+                            String temperature = jsonObject.getString("temp");
+                            String town = jsonObject.getString("city_name");
+                            String appTemp = jsonObject.getString("app_temp");
+                            String humidity = jsonObject.getString("rh");
+                            String windSpeed = jsonObject.getString("wind_spd");
 
-                            weatherImageView.setImageResource(R.drawable.weather);
+                            JSONObject weatherJsonObject = jsonObject.getJSONObject("weather");
+                            String imageCode = weatherJsonObject.getString("icon");
+                            weatherImageView.setImageResource(getResources().
+                                    getIdentifier(imageCode, "drawable", getPackageName()));
                             tempTextView.setText(getString(R.string.temperature, temperature));
                             townTextView.setText(town);
                             appTempTextView.setText(getString(R.string.app_temperature, appTemp));
