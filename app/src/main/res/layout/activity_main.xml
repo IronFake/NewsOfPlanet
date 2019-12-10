@@ -26,12 +26,12 @@
                         android:layout_weight="1"
                         android:layout_width="0dp"
                         android:clickable="true"
-                        android:onClick="onClick"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_vertical"
                         android:queryHint="@string/search_hint"/>
 
                     <ImageButton
+                        android:id="@+id/filterImageButton"
                         android:background="@android:color/white"
                         android:layout_gravity="center_vertical"
                         android:src="@drawable/ic_filter_list_black_50dp"

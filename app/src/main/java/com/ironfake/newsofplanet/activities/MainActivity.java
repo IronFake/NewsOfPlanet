@@ -19,6 +19,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.SearchView;
 import android.widget.TextView;
@@ -65,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private RequestQueue requestQueue;
 
     private SearchView searchView;
+    private ImageButton filterImageButton;
     private SwipeRefreshLayout swipeRefreshLayout;
 
     private String newsUrl;
@@ -78,7 +80,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private GoogleApiClient googleApiClient;
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
     private LocationRequest locationRequest;
-    private static final long UPDATE_INTERVAL = 5000, FASTEST_INTERVAL = 5000; // 5 seconds
+    private static final long UPDATE_INTERVAL = 3600, FASTEST_INTERVAL = 3600; // 1 hour in seconds
 
     //lists for permissions
     ArrayList<String> permissionsToRequest;
@@ -91,6 +93,19 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        filterImageButton = findViewById(R.id.filterImageButton);
+        filterImageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                AlertDialog.Builder mBuilder = new AlertDialog.Builder(MainActivity.this);
+                View mView = getLayoutInflater().inflate(R.layout.filter_dialog_view, null);
+
+                mBuilder.setView(mView);
+                AlertDialog dialog = mBuilder.create();
+                dialog.show();
+            }
+        });
 
         searchView = findViewById(R.id.searchView);
         searchView.setOnClickListener(new View.OnClickListener() {
@@ -244,8 +259,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         //Permissions ok, we get last location
         location = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
 
+        //startLocationUpdates();
         if (location != null){
-            //getWeather(location.getLatitude(), location.getLongitude());
+            Toast.makeText(this, "onConnect", Toast.LENGTH_LONG).show();
+            getWeather(location.getLatitude(), location.getLongitude());
 //            locationTextView.setText(getString(R.string.location,
 //                    location.getLatitude(), location.getLongitude()));
         }
@@ -253,6 +270,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
     private void startLocationUpdates() {
+        Toast.makeText(this, "In slu", Toast.LENGTH_LONG).show();
         locationRequest = new LocationRequest();
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         locationRequest.setInterval(UPDATE_INTERVAL);
@@ -284,7 +302,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onLocationChanged(Location location) {
 
         if (location != null){
-            //getWeather(location.getLatitude(), location.getLongitude());
+            Toast.makeText(this, "onChange", Toast.LENGTH_LONG).show();
+            getWeather(location.getLatitude(), location.getLongitude());
+            LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
 //            locationTextView.setText(getString(R.string.location,
 //                    location.getLatitude(), location.getLongitude()));
         }
@@ -406,6 +426,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         appTempTextView = findViewById(R.id.appTempTextView);
         humidityTextView = findViewById(R.id.humidityTextView);
         windSpeedTextView = findViewById(R.id.windSpeedTextView);
+
+        Toast.makeText(this, "In weather", Toast.LENGTH_SHORT).show();
 
         String weatherUrl = "https://api.weatherbit.io/v2.0/current?lat=" + currentLatitude +
                 "&lon=" + currentLongitude + "&key=" + API_KEY_WEATHER;
