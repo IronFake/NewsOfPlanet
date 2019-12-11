@@ -1,12 +1,25 @@
 <resources>
     <string name="app_name">News of Planet</string>
-    <string name="greeting">Hello, %1d</string>
+    <string name="creator">created by Iron Fake</string>
+    <string name="usedAPI">used API: used API: NEWS API &amp; WeatherBit API</string>
+
+    <string name="heading_headlines">Top headlines:</string>
+    <string name="heading_search_result">Search result:</string>
+    <string name="sort_by">Sort by:</string>
     <string name="search_label">Search</string>
     <string name="search_hint">Search news</string>
 
     <string name="temperature">%1$s\u00B0</string>
     <string name="app_temperature">Apparent Temperature: %1$s\u00B0</string>
-    <string name="humidity">Humidity: %1$s</string>
+    <string name="humidity">Humidity: %1$s%%</string>
     <string name="wind_speed">Wind speed: %1$s m/s</string>
+
+    <string-array name="sort_by_spinner_array">
+        <item>PublishedAt</item>
+        <item>Popularity</item>
+        <item>Relevancy</item>
+    </string-array>
+    
+    
 
 </resources>

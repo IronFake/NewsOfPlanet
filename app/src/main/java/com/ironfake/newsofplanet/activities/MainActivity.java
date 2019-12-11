@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -19,9 +20,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.SearchView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,26 +59,34 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private final String API_KEY_NEWS = "ef28b00ad7e34564b0628ee9dffc4bfc";
     private final String API_KEY_WEATHER = "763ee1da671f4f21913bffda4f36937d";
 
+    //news
     private RecyclerView newsRecyclerView;
     private NewsAdapter newsAdapter;
     private ArrayList<News> newsArrayList;
 
+    //categories
     private RecyclerView categoryNewsRecyclerView;
     private CategoryNewsAdapter categoryNewsAdapter;
     private ArrayList<String> categoriesArrayList;
     private final String[] categories = {"Business", "Entertainment", "General", "Health", "Sports", "Technology"};
 
+    //search queue
     private RequestQueue requestQueue;
-
     private SearchView searchView;
-    private ImageButton filterImageButton;
     private SwipeRefreshLayout swipeRefreshLayout;
 
     private String newsUrl;
     private String currentCategory;
 
+    //weather
     private ImageView weatherImageView;
     private TextView tempTextView, townTextView, appTempTextView, humidityTextView, windSpeedTextView;
+
+    //filter dialog elements
+    private Spinner sortBySpinner;
+    private String currentMethodSort;
+    private TextView headingTextView;
+    private LinearLayout sortByLinearLayout;
 
     //location
     private Location location;
@@ -89,24 +102,46 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     // integer for permissions result request
     private static final int ALL_PERMISSIONS_RESULT = 1011;
 
+    //
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        filterImageButton = findViewById(R.id.filterImageButton);
-        filterImageButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                AlertDialog.Builder mBuilder = new AlertDialog.Builder(MainActivity.this);
-                View mView = getLayoutInflater().inflate(R.layout.filter_dialog_view, null);
+        headingTextView = findViewById(R.id.headingTextView);
+        sortByLinearLayout = findViewById(R.id.sortByLinearLayout);
 
-                mBuilder.setView(mView);
-                AlertDialog dialog = mBuilder.create();
-                dialog.show();
+        createSearchView();
+        createSortBySpinner();
+        createCategoriesRecyclerView();
+        createNewsRecyclerView();
+
+        //we build google api client
+        googleApiClient = new GoogleApiClient.Builder(this).
+                addApi(LocationServices.API).
+                addConnectionCallbacks(this).
+                addOnConnectionFailedListener(this).build();
+
+        //we add permissions we need to request location of the users
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+
+        permissionsToRequest = permissionsToRequest(permissions);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            if (permissionsToRequest.size() > 0){
+                requestPermissions(permissionsToRequest
+                        .toArray(new String[permissionsToRequest.size()]),ALL_PERMISSIONS_RESULT);
             }
-        });
+        }
 
+
+
+        getNews("");
+    }
+
+    private void createSearchView(){
         searchView = findViewById(R.id.searchView);
         searchView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -117,9 +152,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                getNews("q=" + query.trim());
                 searchView.setQuery(query, false);
                 searchView.clearFocus();
+                headingTextView.setText(R.string.heading_search_result);
+                sortByLinearLayout.setVisibility(View.VISIBLE);
+                getNews("q=" + query.trim());
                 return true;
             }
 
@@ -128,7 +165,30 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 return false;
             }
         });
+    }
 
+    private void createSortBySpinner(){
+        sortBySpinner = findViewById(R.id.sortBySpinner);
+        ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(R.array.sort_by_spinner_array));
+        sortBySpinner.setAdapter(arrayAdapter);
+        sortBySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                currentMethodSort = sortBySpinner.getSelectedItem().toString();
+                Toast.makeText(MainActivity.this, currentMethodSort, Toast.LENGTH_LONG).show();
+                getNews("q=" + searchView.getQuery());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+    }
+
+    private void createCategoriesRecyclerView(){
         categoriesArrayList = new ArrayList<>();
         for (int i = 0; i < categories.length; i++) {
             categoriesArrayList.add(categories[i]);
@@ -142,14 +202,20 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             @Override
             public void onUserClick(int position) {
                 currentCategory = categories[position];
+                headingTextView.setText(R.string.heading_headlines);
+                sortByLinearLayout.setVisibility(View.GONE);
+                searchView.setQuery("", false);
                 getNews("category=" +currentCategory);
             }
         });
         categoryNewsRecyclerView.setAdapter(categoryNewsAdapter);
+    }
 
+    private void createNewsRecyclerView(){
         newsRecyclerView = findViewById(R.id.newsRecyclerView);
+        int countColumn = getResources().getInteger(R.integer.column_count);
         newsRecyclerView.hasFixedSize();
-        newsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        newsRecyclerView.setLayoutManager(new GridLayoutManager(this, countColumn));
         newsArrayList = new ArrayList<>();
         requestQueue = Volley.newRequestQueue(this);
 
@@ -163,28 +229,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 swipeRefreshLayout.setRefreshing(false);
             }
         });
-
-        //we add permissions we need to request location of the users
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
-
-        permissionsToRequest = permissionsToRequest(permissions);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-            if (permissionsToRequest.size() > 0){
-                requestPermissions(permissionsToRequest
-                        .toArray(new String[permissionsToRequest.size()]),ALL_PERMISSIONS_RESULT
-                );
-            }
-        }
-
-        //we build google api client
-        googleApiClient = new GoogleApiClient.Builder(this).
-                addApi(LocationServices.API).
-                addConnectionCallbacks(this).
-                addOnConnectionFailedListener(this).build();
-
-        getNews("");
     }
 
     private ArrayList<String> permissionsToRequest(ArrayList<String> wantedPermissions) {
@@ -261,16 +305,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         //startLocationUpdates();
         if (location != null){
-            Toast.makeText(this, "onConnect", Toast.LENGTH_LONG).show();
             getWeather(location.getLatitude(), location.getLongitude());
-//            locationTextView.setText(getString(R.string.location,
-//                    location.getLatitude(), location.getLongitude()));
         }
         startLocationUpdates();
     }
 
     private void startLocationUpdates() {
-        Toast.makeText(this, "In slu", Toast.LENGTH_LONG).show();
         locationRequest = new LocationRequest();
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         locationRequest.setInterval(UPDATE_INTERVAL);
@@ -302,11 +342,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onLocationChanged(Location location) {
 
         if (location != null){
-            Toast.makeText(this, "onChange", Toast.LENGTH_LONG).show();
             getWeather(location.getLatitude(), location.getLongitude());
             LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
-//            locationTextView.setText(getString(R.string.location,
-//                    location.getLatitude(), location.getLongitude()));
         }
 
     }
@@ -342,7 +379,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     }
                 } else {
                     if (googleApiClient != null){
-                        googleApiClient.connect();
+                        googleApiClient.reconnect();
                     }
                 }
 
@@ -353,7 +390,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private void getNews(String query) {
         newsArrayList.clear();
         if (query.contains("q=")){
-            newsUrl = "https://newsapi.org/v2/everything?language=en&q=" +query + "&apiKey=" + API_KEY_NEWS;
+            newsUrl = "https://newsapi.org/v2/everything?language=en&sortBy="+ currentMethodSort +
+                    "&" +query + "&apiKey=" + API_KEY_NEWS;
         } else if (query.contains("category=")){
             newsUrl = "https://newsapi.org/v2/top-headlines?country=us&" +query + "&apiKey=" + API_KEY_NEWS;
         } else {
@@ -426,8 +464,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         appTempTextView = findViewById(R.id.appTempTextView);
         humidityTextView = findViewById(R.id.humidityTextView);
         windSpeedTextView = findViewById(R.id.windSpeedTextView);
-
-        Toast.makeText(this, "In weather", Toast.LENGTH_SHORT).show();
 
         String weatherUrl = "https://api.weatherbit.io/v2.0/current?lat=" + currentLatitude +
                 "&lon=" + currentLongitude + "&key=" + API_KEY_WEATHER;
