@@ -8,6 +8,8 @@
     <string name="sort_by">Sort by:</string>
     <string name="search_label">Search</string>
     <string name="search_hint">Search news</string>
+    <string name="news_not_fount">News not found</string>
+    <string name="tap_to_change_town">Tap to change city</string>
 
     <string name="temperature">%1$s\u00B0</string>
     <string name="app_temperature">Apparent Temperature: %1$s\u00B0</string>
@@ -19,7 +21,7 @@
         <item>Popularity</item>
         <item>Relevancy</item>
     </string-array>
-    
-    
+
+    <string name="label_text">Choose your town</string>
 
 </resources>

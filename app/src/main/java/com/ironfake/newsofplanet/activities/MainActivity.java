@@ -11,8 +11,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
@@ -22,7 +24,8 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.ImageButton;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SearchView;
@@ -63,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private RecyclerView newsRecyclerView;
     private NewsAdapter newsAdapter;
     private ArrayList<News> newsArrayList;
+    private TextView newsNotFoundTextView;
 
     //categories
     private RecyclerView categoryNewsRecyclerView;
@@ -80,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     //weather
     private ImageView weatherImageView;
-    private TextView tempTextView, townTextView, appTempTextView, humidityTextView, windSpeedTextView;
+    private TextView tempTextView, cityTextView, appTempTextView, humidityTextView, windSpeedTextView;
 
     //filter dialog elements
     private Spinner sortBySpinner;
@@ -103,6 +107,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private static final int ALL_PERMISSIONS_RESULT = 1011;
 
     //
+    SharedPreferences sharedPreferences;
+    SharedPreferences.Editor editor;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +117,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         headingTextView = findViewById(R.id.headingTextView);
         sortByLinearLayout = findViewById(R.id.sortByLinearLayout);
+
+        sharedPreferences = this.getSharedPreferences("app preferences", Context.MODE_PRIVATE);
+        editor = sharedPreferences.edit();
+
 
         createSearchView();
         createSortBySpinner();
@@ -139,6 +149,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
         getNews("");
+        getWeather();
     }
 
     private void createSearchView(){
@@ -213,6 +224,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     private void createNewsRecyclerView(){
         newsRecyclerView = findViewById(R.id.newsRecyclerView);
+        newsNotFoundTextView = findViewById(R.id.newsNotFoundTextView);
         int countColumn = getResources().getInteger(R.integer.column_count);
         newsRecyclerView.hasFixedSize();
         newsRecyclerView.setLayoutManager(new GridLayoutManager(this, countColumn));
@@ -305,7 +317,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         //startLocationUpdates();
         if (location != null){
-            getWeather(location.getLatitude(), location.getLongitude());
+            getWeather();
         }
         startLocationUpdates();
     }
@@ -342,7 +354,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onLocationChanged(Location location) {
 
         if (location != null){
-            getWeather(location.getLatitude(), location.getLongitude());
+            getWeather();
             LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
         }
 
@@ -403,7 +415,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 @Override
                 public void onResponse(JSONObject response) {
                 try {
-                    JSONArray jsonArray = response.getJSONArray("articles");
+                    final JSONArray jsonArray = response.getJSONArray("articles");
+                    if (jsonArray.length() < 1) newsNotFoundTextView.setVisibility(View.VISIBLE);
+                    else newsNotFoundTextView.setVisibility(View.GONE);
                     for (int i = 0; i < jsonArray.length(); i++) {
                         JSONObject newsJsonObject = jsonArray.getJSONObject(i);
 
@@ -430,8 +444,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     newsAdapter = new NewsAdapter(MainActivity.this, newsArrayList);
                     newsAdapter.setOnUserClickListener(new NewsAdapter.OnUserClickListener() {
                         @Override
-                        public void onUserClick(int position) {
+                        public void onUserClick(int position) throws JSONException {
                             News news = newsArrayList.get(position);
+
                             Uri address = Uri.parse(news.getSiteNewsUrl());
                             Intent openLinkIntent = new Intent(Intent.ACTION_VIEW, address);
 
@@ -456,17 +471,25 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         requestQueue.add(request);
     }
 
-    private void getWeather(Double currentLatitude, Double currentLongitude){
+    private void getWeather(){
 
         weatherImageView = findViewById(R.id.weatherImageView);
         tempTextView = findViewById(R.id.temperatureTextView);
-        townTextView = findViewById(R.id.townTextView);
+        cityTextView = findViewById(R.id.cityTextView);
         appTempTextView = findViewById(R.id.appTempTextView);
         humidityTextView = findViewById(R.id.humidityTextView);
         windSpeedTextView = findViewById(R.id.windSpeedTextView);
 
-        String weatherUrl = "https://api.weatherbit.io/v2.0/current?lat=" + currentLatitude +
-                "&lon=" + currentLongitude + "&key=" + API_KEY_WEATHER;
+        String weatherUrl;
+        if (googleApiClient.isConnected() && location != null){
+            weatherUrl = "https://api.weatherbit.io/v2.0/current?lat=" + location.getLatitude() +
+                    "&lon=" + location.getLongitude() + "&key=" + API_KEY_WEATHER;
+        }else{
+            String city = sharedPreferences.getString("city name", "Moscow");
+            weatherUrl = "https://api.weatherbit.io/v2.0/current?city=" + city
+                    + "&key=" + API_KEY_WEATHER;
+        }
+
 
         JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, weatherUrl, null,
             new Response.Listener<JSONObject>() {
@@ -488,7 +511,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                             weatherImageView.setImageResource(getResources().
                                     getIdentifier(imageCode, "drawable", getPackageName()));
                             tempTextView.setText(getString(R.string.temperature, temperature));
-                            townTextView.setText(town);
+                            cityTextView.setText(town);
                             appTempTextView.setText(getString(R.string.app_temperature, appTemp));
                             humidityTextView.setText(getString(R.string.humidity, humidity));
                             windSpeedTextView.setText(getString(R.string.wind_speed, windSpeed));
@@ -505,5 +528,50 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     });
     requestQueue.add(request);
+    }
+
+    public void setTown(View view) {
+        AlertDialog.Builder setTownBuilder = new AlertDialog.Builder(MainActivity.this);
+        View setTownView = getLayoutInflater().inflate(R.layout.change_city_alert_dialog, null);
+        final EditText cityNameEditText = setTownView.findViewById(R.id.cityNameEditText);
+        final Button saveButton = setTownView.findViewById(R.id.saveButton);
+
+        setTownBuilder.setView(setTownView);
+        final AlertDialog dialog = setTownBuilder.create();
+        dialog.show();
+
+        saveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String city = cityNameEditText.getText().toString().trim();
+                String weatherUrl = "https://api.weatherbit.io/v2.0/current?city=" + city +
+                        "&key=" + API_KEY_WEATHER;
+                JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, weatherUrl, null,
+                        new Response.Listener<JSONObject>() {
+                            @Override
+                            public void onResponse(JSONObject response) {
+                                try {
+                                    JSONArray jsonArray = response.getJSONArray("data");
+                                    editor.putString("city name", city);
+                                    editor.commit();
+                                    Toast.makeText(MainActivity.this, "City: " + city + " saved", Toast.LENGTH_LONG).show();
+                                    dialog.dismiss();
+                                    getWeather();
+                                } catch (JSONException e) {
+                                    //Toast.makeText(MainActivity.this, "Enter correct city name", Toast.LENGTH_LONG).show();
+                                    e.printStackTrace();
+                                }
+                            }
+                        }, new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Toast.makeText(MainActivity.this, "Enter correct city name", Toast.LENGTH_LONG).show();
+                        error.printStackTrace();
+                    }
+                });
+                requestQueue.add(request);
+            }
+        });
+
     }
 }

@@ -14,6 +14,8 @@ import com.ironfake.newsofplanet.R;
 import com.ironfake.newsofplanet.model.News;
 import com.squareup.picasso.Picasso;
 
+import org.json.JSONException;
+
 import java.util.ArrayList;
 
 public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder> {
@@ -23,7 +25,7 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
 
     private OnUserClickListener listener;
     public interface OnUserClickListener{
-        void onUserClick(int position);
+        void onUserClick(int position) throws JSONException;
     }
     public void setOnUserClickListener(OnUserClickListener listener){
         this.listener = listener;
@@ -89,7 +91,11 @@ public class NewsAdapter extends RecyclerView.Adapter<NewsAdapter.NewsViewHolder
                     if (listener != null){
                         int position = getAdapterPosition();
                         if (position != RecyclerView.NO_POSITION){
-                            listener.onUserClick(position);
+                            try {
+                                listener.onUserClick(position);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }

@@ -52,6 +52,7 @@
     <SearchView
         android:id="@+id/searchView"
         android:clickable="true"
+        android:iconifiedByDefault="false"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
@@ -87,74 +88,104 @@
                     app:cardUseCompatPadding="true">
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:id="@+id/weatherImageView"
-                            android:layout_width="60dp"
-                            android:layout_height="60dp"
-                            android:layout_gravity="center_vertical" />
-
-                        <TextView
-                            android:id="@+id/temperatureTextView"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:layout_marginStart="0dp"
-                            android:gravity="center_vertical"
-                            android:text="1\u00B0"
-                            android:textSize="30sp" />
-
-                        <ImageView
-                            android:id="@+id/locationIcon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="top"
-                            android:layout_marginStart="20dp"
-                            android:layout_marginTop="5dp"
-                            android:src="@drawable/ic_location_on_black_24dp" />
+                        android:orientation="vertical"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
+                            android:gravity="center_horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content">
+
+                            <ImageView
+                                android:id="@+id/weatherImageView"
+                                android:layout_width="60dp"
+                                android:layout_height="60dp"
+                                android:layout_gravity="center_vertical" />
 
                             <TextView
-                                android:id="@+id/townTextView"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="town"
-                                android:textSize="20sp" />
+                                android:id="@+id/temperatureTextView"
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:layout_marginStart="0dp"
+                                android:gravity="center_vertical"
+                                android:text="1\u00B0"
+                                android:textColor="@android:color/black"
+                                android:textSize="30sp" />
 
-                            <TextView
-                                android:id="@+id/appTempTextView"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:paddingTop="@dimen/app_padding"
-                                android:text="@string/app_temperature"
-                                android:textSize="12sp" />
+                            <ImageView
+                                android:id="@+id/locationIcon"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="top"
+                                android:layout_marginStart="20dp"
+                                android:layout_marginTop="5dp"
+                                android:src="@drawable/ic_location_on_black_24dp" />
 
-                            <TextView
-                                android:id="@+id/humidityTextView"
-                                android:layout_width="match_parent"
+                            <LinearLayout
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/humidity"
-                                android:textSize="12sp" />
+                                android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/windSpeedTextView"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/wind_speed"
-                                android:textSize="12sp" />
+                                <TextView
+                                    android:id="@+id/cityTextView"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="@android:color/black"
+                                    android:text="city"
+                                    android:textSize="20sp" />
+
+                                <TextView
+                                    android:id="@+id/appTempTextView"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:paddingTop="@dimen/app_padding"
+                                    android:text="@string/app_temperature"
+                                    android:textColor="@android:color/black"
+                                    android:textSize="14sp" />
+
+                                <TextView
+                                    android:id="@+id/humidityTextView"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/humidity"
+                                    android:textColor="@android:color/black"
+                                    android:textSize="14sp" />
+
+                                <TextView
+                                    android:id="@+id/windSpeedTextView"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/wind_speed"
+                                    android:textColor="@android:color/black"
+                                    android:textSize="14sp" />
+
+                            </LinearLayout>
 
                         </LinearLayout>
+
+                        <TextView
+                            android:text="@string/tap_to_change_town"
+                            android:textSize="12dp"
+                            android:gravity="center_horizontal"
+                            android:layout_marginTop="5dp"
+                            android:layout_marginBottom="5dp"
+                            android:onClick="setTown"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"/>
 
                     </LinearLayout>
 
                 </androidx.cardview.widget.CardView>
+
+                <TextView
+                    android:id="@+id/newsNotFoundTextView"
+                    android:visibility="gone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:text="@string/news_not_fount"
+                    android:textSize="15sp" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/newsRecyclerView"
